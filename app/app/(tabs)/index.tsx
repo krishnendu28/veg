@@ -5,6 +5,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -57,6 +58,9 @@ const heroSlides = [
     subtitle: "From quick bites to royal plates, all in one app.",
   },
 ];
+
+const RESTAURANT_PHONE_LABEL = "+91 8420252042";
+const RESTAURANT_PHONE_DIAL = "+918420252042";
 
 export default function MenuScreen() {
   const { session, isHydrated, login, logout } = useSession();
@@ -118,6 +122,20 @@ export default function MenuScreen() {
     login(loginName, loginPhone);
   };
 
+  const callRestaurant = async () => {
+    const dialUrl = `tel:${RESTAURANT_PHONE_DIAL}`;
+    try {
+      const supported = await Linking.canOpenURL(dialUrl);
+      if (!supported) {
+        Alert.alert("Call unavailable", `Please call ${RESTAURANT_PHONE_LABEL}`);
+        return;
+      }
+      await Linking.openURL(dialUrl);
+    } catch {
+      Alert.alert("Call unavailable", `Please call ${RESTAURANT_PHONE_LABEL}`);
+    }
+  };
+
   const addToCart = (item: MenuItem) => {
     const variants = Object.keys(item.prices || {});
     const selectedVariant = variantSelections[item.name] || variants[0] || "Regular";
@@ -171,8 +189,8 @@ export default function MenuScreen() {
   const placeOrder = async () => {
     if (!session) return;
 
-    if (!flatNo.trim() || !roomFloor.trim() || !landmark.trim()) {
-      Alert.alert("Address required", "Please add Flat No, Room/Floor and Landmark.");
+    if (!flatNo.trim() || !roomFloor.trim()) {
+      Alert.alert("Address required", "Please add Flat No and Room/Floor.");
       return;
     }
 
@@ -186,7 +204,7 @@ export default function MenuScreen() {
       await axios.post(`${API_BASE_URL}/api/orders`, {
         customerName: session.name,
         phone: session.phone,
-        address: `Flat: ${flatNo}, Room/Floor: ${roomFloor}, Landmark: ${landmark}`,
+        address: `Flat: ${flatNo}, Room/Floor: ${roomFloor}${landmark.trim() ? `, Landmark: ${landmark}` : ""}`,
         items: cartItems,
         deliveryCharge,
         total: grandTotal,
@@ -224,6 +242,10 @@ export default function MenuScreen() {
           <Text style={styles.loginSubtitle}>Premium food ordering in your pocket.</Text>
           <TextInput value={loginName} onChangeText={setLoginName} placeholder="Your name" placeholderTextColor="#999" style={styles.input} />
           <TextInput value={loginPhone} onChangeText={setLoginPhone} placeholder="Phone number" placeholderTextColor="#999" style={styles.input} keyboardType="phone-pad" />
+          <TouchableOpacity style={styles.callBtn} onPress={callRestaurant}>
+            <Ionicons name="call-outline" size={16} color="#F5EFE4" />
+            <Text style={styles.callBtnText}>Call Restaurant: {RESTAURANT_PHONE_LABEL}</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
             <Text style={styles.loginBtnText}>Continue</Text>
           </TouchableOpacity>
@@ -241,6 +263,9 @@ export default function MenuScreen() {
             <Text style={styles.brand}>Chakhna By Kilo</Text>
             <Text style={styles.tagline}>By Kilo, By Choice, By Taste</Text>
           </View>
+          <TouchableOpacity onPress={callRestaurant} style={styles.callIconBtn}>
+            <Ionicons name="call-outline" size={17} color="#F5EFE4" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
             <Ionicons name="log-out-outline" size={18} color="#F5EFE4" />
           </TouchableOpacity>
@@ -345,7 +370,7 @@ export default function MenuScreen() {
 
             <TextInput value={flatNo} onChangeText={setFlatNo} placeholder="Flat no" placeholderTextColor="#999" style={styles.input} />
             <TextInput value={roomFloor} onChangeText={setRoomFloor} placeholder="Room no / Floor" placeholderTextColor="#999" style={styles.input} />
-            <TextInput value={landmark} onChangeText={setLandmark} placeholder="Nearby landmark" placeholderTextColor="#999" style={styles.input} />
+            <TextInput value={landmark} onChangeText={setLandmark} placeholder="Nearby landmark (optional)" placeholderTextColor="#999" style={styles.input} />
 
             <View style={styles.billBox}>
               <Text style={styles.billText}>Subtotal: Rs {subtotal}</Text>
@@ -373,12 +398,15 @@ const styles = StyleSheet.create({
   loginTitle: { color: "#F5EFE4", fontSize: 24, fontWeight: "700", textAlign: "center" },
   loginSubtitle: { color: "#C5BFAF", textAlign: "center", marginBottom: 12 },
   input: { backgroundColor: "#1C1C1C", color: "#F5EFE4", borderRadius: 10, borderWidth: 1, borderColor: "#303030", paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
+  callBtn: { backgroundColor: "#1E3A28", borderRadius: 10, paddingVertical: 10, marginBottom: 8, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "#2A5B3B" },
+  callBtnText: { color: "#F5EFE4", textAlign: "center", fontWeight: "700" },
   loginBtn: { backgroundColor: "#D4A017", borderRadius: 10, paddingVertical: 11, marginTop: 2 },
   loginBtnText: { color: "#121212", textAlign: "center", fontWeight: "700" },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10, gap: 10 },
   headerLogo: { width: 42, height: 42, borderRadius: 21 },
   brand: { color: "#F5EFE4", fontSize: 16, fontWeight: "700" },
   tagline: { color: "#A7A29A", fontSize: 12 },
+  callIconBtn: { backgroundColor: "#1E3A28", borderRadius: 18, padding: 8 },
   logoutBtn: { backgroundColor: "#8B0000", borderRadius: 18, padding: 8 },
   heroWrap: {
     marginHorizontal: 2,
