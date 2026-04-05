@@ -1,6 +1,46 @@
 import { io } from "socket.io-client";
 
-export const USER_BACKEND_URL = "http://localhost:5000";
+export const USER_BACKEND_URL = import.meta.env.VITE_API_BASE_URL || "https://cbk-4dmf.onrender.com";
+const TABIO_SESSION_TOKEN_KEY = "tabio_session_token";
+
+function resolveAdminToken() {
+  const fromEnv = String(import.meta.env.VITE_ADMIN_API_KEY || "").trim();
+  if (fromEnv) return fromEnv;
+
+  const fromLegacyEnv = String(import.meta.env.VITE_OWNER_API_KEY || "").trim();
+  if (fromLegacyEnv) return fromLegacyEnv;
+
+  const fromSession = String(localStorage.getItem(TABIO_SESSION_TOKEN_KEY) || "").trim();
+  if (fromSession) return fromSession;
+
+  return "";
+}
+
+function buildAdminHeaders(extraHeaders: Record<string, string> = {}) {
+  const token = resolveAdminToken();
+  if (!token) return extraHeaders;
+
+  return {
+    ...extraHeaders,
+    Authorization: `Bearer ${token}`,
+    "x-admin-key": token,
+  };
+}
+
+async function buildRequestError(response: Response, fallbackMessage: string) {
+  let message = fallbackMessage;
+  try {
+    const data = await response.json();
+    const responseMessage = typeof data?.message === "string" ? data.message.trim() : "";
+    if (responseMessage) {
+      message = responseMessage;
+    }
+  } catch {
+    // no-op
+  }
+
+  return new Error(`${message} (HTTP ${response.status})`);
+}
 
 export type BridgeOrderStatus = "Preparing" | "Ready" | "Delivered";
 
@@ -650,20 +690,21 @@ export async function fetchBridgeOrders(): Promise<BridgeOrder[]> {
 export async function patchBridgeOrderStatus(orderId: string, status: BridgeOrderStatus): Promise<BridgeOrder> {
   const response = await fetch(`${USER_BACKEND_URL}/api/orders/${orderId}`, {
     method: "PATCH",
-    headers: {
+    headers: buildAdminHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify({ status }),
   });
-  if (!response.ok) throw new Error("Failed to update order status");
+  if (!response.ok) throw await buildRequestError(response, "Failed to update order status");
   return response.json();
 }
 
 export async function deleteBridgeOrder(orderId: string): Promise<void> {
   const response = await fetch(`${USER_BACKEND_URL}/api/orders/${orderId}`, {
     method: "DELETE",
+    headers: buildAdminHeaders(),
   });
-  if (!response.ok) throw new Error("Failed to delete order");
+  if (!response.ok) throw await buildRequestError(response, "Failed to delete order");
 }
 
 export function subscribeBridgeOrders(

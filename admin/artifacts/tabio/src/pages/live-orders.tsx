@@ -3,9 +3,10 @@ import { io } from "socket.io-client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { deleteBridgeOrder, patchBridgeOrderStatus, USER_BACKEND_URL } from "@/lib/bridge";
+import { toast } from "@/hooks/use-toast";
 import { Trash2 } from "lucide-react";
 
-const USER_BACKEND_URL = "http://localhost:5000";
 const socket = io(USER_BACKEND_URL, { autoConnect: true });
 const statuses = ["Preparing", "Ready", "Delivered"] as const;
 
@@ -81,28 +82,32 @@ export default function LiveOrders() {
     const next = nextStatus(order.status);
     if (next === order.status) return;
 
-    const response = await fetch(`${USER_BACKEND_URL}/api/orders/${order._id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ status: next }),
-    });
-
-    const updated = await response.json();
-    setOrders((prev) => prev.map((row) => (row._id === order._id ? updated : row)));
+      try {
+        const updated = await patchBridgeOrderStatus(order._id, next);
+        setOrders((prev) => prev.map((row) => (row._id === order._id ? updated : row)));
+      } catch (error) {
+        toast({
+          title: "Failed to update order",
+          description: error instanceof Error ? error.message : "Unknown error",
+          variant: "destructive",
+        });
+      }
   }
 
   async function deleteOrder(order: LiveOrder) {
     const ok = window.confirm(`Delete order #${order._id.slice(-6)}? This cannot be undone.`);
     if (!ok) return;
 
-    const response = await fetch(`${USER_BACKEND_URL}/api/orders/${order._id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) return;
-
-    setOrders((prev) => prev.filter((row) => row._id !== order._id));
+    try {
+      await deleteBridgeOrder(order._id);
+      setOrders((prev) => prev.filter((row) => row._id !== order._id));
+    } catch (error) {
+      toast({
+        title: "Failed to delete order",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   }
 
   return (

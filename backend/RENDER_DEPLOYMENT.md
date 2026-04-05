@@ -12,6 +12,8 @@ Render deployment for backend
   Example: https://your-frontend.onrender.com,https://your-custom-domain.com
 - Set ADMIN_API_KEYS for role-based admin access
   Example: owner:super-secret-owner-key,manager:super-secret-manager-key
+- Optional: set ENFORCE_ADMIN_AUTH=true to strictly require admin keys for protected routes
+  - If false (default), protected routes are temporarily allowed when ADMIN_API_KEYS is not configured
 - ALLOW_RENDER_PREVIEWS defaults to true and allows *.onrender.com origins
 
 3. Configure cron keepalive env var

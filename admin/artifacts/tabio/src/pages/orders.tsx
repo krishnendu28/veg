@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 import {
   BridgeOrder,
   deleteBridgeOrder,
@@ -56,17 +57,33 @@ export default function Orders() {
 
   async function handleNextStatus(order: BridgeOrder) {
     if (order.status === "Delivered") return;
-    const updated = await patchBridgeOrderStatus(order._id, nextBridgeStatus(order.status));
-    setOrders((prev) => prev.map((row) => (row._id === updated._id ? updated : row)));
+    try {
+      const updated = await patchBridgeOrderStatus(order._id, nextBridgeStatus(order.status));
+      setOrders((prev) => prev.map((row) => (row._id === updated._id ? updated : row)));
+    } catch (error) {
+      toast({
+        title: "Failed to update order",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   }
 
   async function handleDeleteOrder(order: BridgeOrder) {
     const ok = window.confirm(`Delete order #${order._id.slice(-6)}? This cannot be undone.`);
     if (!ok) return;
-    await deleteBridgeOrder(order._id);
-    setOrders((prev) => prev.filter((row) => row._id !== order._id));
-    if (selectedOrder?._id === order._id) {
-      setSelectedOrder(null);
+    try {
+      await deleteBridgeOrder(order._id);
+      setOrders((prev) => prev.filter((row) => row._id !== order._id));
+      if (selectedOrder?._id === order._id) {
+        setSelectedOrder(null);
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to delete order",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
     }
   }
 

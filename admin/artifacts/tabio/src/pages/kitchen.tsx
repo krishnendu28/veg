@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 import { ChefHat, CheckCircle2, Clock } from "lucide-react";
 import {
   BridgeOrder,
@@ -40,8 +41,16 @@ export default function KitchenDisplay() {
 
   async function handleMarkNext(order: BridgeOrder) {
     if (order.status === "Delivered") return;
-    const updated = await patchBridgeOrderStatus(order._id, nextBridgeStatus(order.status));
-    setOrders((prev) => prev.map((row) => (row._id === updated._id ? updated : row)));
+    try {
+      const updated = await patchBridgeOrderStatus(order._id, nextBridgeStatus(order.status));
+      setOrders((prev) => prev.map((row) => (row._id === updated._id ? updated : row)));
+    } catch (error) {
+      toast({
+        title: "Failed to update order",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   }
 
   if (isLoading) {
