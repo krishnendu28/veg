@@ -36,3 +36,15 @@ Render deployment for backend
 - Role restrictions:
   - owner/manager: menu create/update, order status update
   - owner only: menu delete, order delete
+
+7. MongoDB checklist (Render + Atlas)
+- Render web service env var key must be exactly: MONGO_URI
+- Use a URI with an explicit database name:
+  - mongodb+srv://<username>:<password>@<cluster-url>/chakhna?retryWrites=true&w=majority
+- Atlas user permissions:
+  - Database Access -> Edit user -> Role must include readWrite on the target DB (for example chakhna)
+- Atlas network access:
+  - Network Access -> Add IP Address -> Allow Access from Anywhere (0.0.0.0/0) for initial testing
+  - After verification, tighten rules as needed
+- Redeploy backend after changing env vars
+- Verify /api/health shows database: "mongo" (not "memory")
