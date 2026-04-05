@@ -4,6 +4,8 @@ import Home from "./pages/Home";
 import OrderHistory from "./pages/OrderHistory";
 
 const USER_SESSION_KEY = "cbk_user_session";
+const ADMIN_DASHBOARD_URL =
+  import.meta.env.VITE_ADMIN_DASHBOARD_URL || "https://cbk-admin.vercel.app";
 
 function App() {
   const [userSession, setUserSession] = useState(() => {
@@ -82,7 +84,7 @@ function App() {
           </form>
 
           <a
-            href="http://localhost:5174"
+            href={ADMIN_DASHBOARD_URL}
             target="_blank"
             rel="noreferrer"
             className="mt-4 inline-block w-full text-center text-sm text-[var(--cbk-gold)] hover:underline"

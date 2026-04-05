@@ -3,6 +3,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cbk-4dmf.onrender.com";
+const BRAND_LOGO_URL = import.meta.env.VITE_BRAND_LOGO_URL || `${API_BASE_URL}/logo.jpeg`;
 const socket = io(API_BASE_URL);
 const statuses = ["Preparing", "Ready", "Delivered"];
 const OWNER_SESSION_KEY = "cbk_owner_session";
@@ -101,7 +102,7 @@ function App() {
     return (
       <div className="admin-login-screen">
         <div className="admin-login-card">
-          <img src="http://localhost:5173/logo.jpeg" alt="Chakhna logo" className="admin-login-logo" />
+          <img src={BRAND_LOGO_URL} alt="Chakhna logo" className="admin-login-logo" />
           <h1>Owner Login</h1>
           <p>Sign in to manage live orders and kitchen tickets.</p>
           <form className="admin-login-form" onSubmit={handleOwnerLogin}>
