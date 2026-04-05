@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const projectRoot = path.resolve(__dirname, "..");
-const sourceDir = path.resolve(projectRoot, "..", "artifacts", "tabio", "dist", "public");
+const sourceDir = path.resolve(projectRoot, "artifact-public");
 const outputDir = path.resolve(projectRoot, "dist");
 
 async function main() {
