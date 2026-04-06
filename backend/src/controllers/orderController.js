@@ -1,4 +1,3 @@
-import { getIO } from "../config/socket.js";
 import {
   createOrder,
   deleteOrder,
@@ -9,7 +8,6 @@ import {
 export async function createOrderHandler(req, res) {
   try {
     const order = await createOrder(req.body);
-    getIO().emit("new_order", order);
     return res.status(201).json(order);
   } catch (error) {
     console.error(error);
@@ -37,7 +35,6 @@ export async function updateOrderStatusHandler(req, res) {
       return res.status(404).json({ message: "Order not found." });
     }
 
-    getIO().emit("order_updated", updatedOrder);
     return res.json(updatedOrder);
   } catch (error) {
     console.error(error);
@@ -53,7 +50,6 @@ export async function deleteOrderHandler(req, res) {
       return res.status(404).json({ message: "Order not found." });
     }
 
-    getIO().emit("order_deleted", { _id: id });
     return res.json({ ok: true, _id: id });
   } catch (error) {
     console.error(error);

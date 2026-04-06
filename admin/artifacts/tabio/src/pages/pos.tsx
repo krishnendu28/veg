@@ -7,6 +7,7 @@ import { ReceiptText, ShoppingCart } from "lucide-react";
 import {
   BridgeMenuItem,
   fetchBridgeMenuGroups,
+  getMenuImageUrl,
   getBridgeMenuGroups,
   getStoredTables,
   saveStoredTables,
@@ -17,16 +18,38 @@ import {
 type CartItem = {
   id: number;
   name: string;
+  variant: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
 };
 
+type DeliveryArea = "DLF" | "PS Group" | "Elita" | "Shapoorji Sukhobrishti";
+
+const FIXED_CHARGE_AREAS: DeliveryArea[] = ["DLF", "PS Group", "Elita"];
+
+function computeDeliveryCharge(orderType: "dine-in" | "takeaway" | "delivery", subtotal: number, deliveryArea: DeliveryArea | "") {
+  if (orderType !== "delivery") return 0;
+  if (!deliveryArea) return 20;
+
+  if (FIXED_CHARGE_AREAS.includes(deliveryArea)) {
+    return 20;
+  }
+
+  if (deliveryArea === "Shapoorji Sukhobrishti") {
+    return subtotal < 200 ? 20 : 0;
+  }
+
+  return 20;
+}
+
 export default function POS() {
   const [menuGroups, setMenuGroups] = useState(getBridgeMenuGroups);
-  const [activeGroupId, setActiveGroupId] = useState(menuGroups[0]?.id || "non-veg-chakhna");
+  const [activeGroupId, setActiveGroupId] = useState(menuGroups[0]?.id || "");
   const [search, setSearch] = useState("");
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway" | "delivery">("dine-in");
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "GPay" | "PhonePe">("Cash");
+  const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | "">("");
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [placing, setPlacing] = useState(false);
@@ -41,6 +64,7 @@ export default function POS() {
 
   const tables = getStoredTables();
   const availableTables = tables.filter((table) => table.status === "available");
+  const menuImageUrl = getMenuImageUrl();
 
   const activeGroup = menuGroups.find((group) => group.id === activeGroupId) || menuGroups[0];
 
@@ -66,15 +90,26 @@ export default function POS() {
   );
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.totalPrice, 0), [cart]);
-  const deliveryCharge = cart.length > 0 && orderType === "delivery" ? 20 : 0;
+  const deliveryCharge = cart.length > 0 ? computeDeliveryCharge(orderType, subtotal, deliveryArea) : 0;
   const total = subtotal + deliveryCharge;
+  const deliveryTermsMessage =
+    deliveryArea === "Shapoorji Sukhobrishti"
+      ? subtotal < 200
+        ? "Shapoorji Sukhobrishti: delivery is Rs 20 for subtotal below Rs 200."
+        : "Shapoorji Sukhobrishti: free delivery for subtotal Rs 200 or above."
+      : deliveryArea
+        ? `${deliveryArea}: fixed delivery charge Rs 20.`
+        : "Select delivery area to apply the correct delivery rule.";
 
-  function addToCart(item: BridgeMenuItem) {
+  function addToCart(item: BridgeMenuItem, variant: string = "Regular") {
+    const variantPrice = Number(item.prices?.[variant]);
+    const unitPrice = Number.isFinite(variantPrice) ? variantPrice : item.price;
+
     setCart((prev) => {
-      const existing = prev.find((entry) => entry.id === item.id);
+      const existing = prev.find((entry) => entry.id === item.id && entry.variant === variant);
       if (existing) {
         return prev.map((entry) =>
-          entry.id === item.id
+          entry.id === item.id && entry.variant === variant
             ? {
                 ...entry,
                 quantity: entry.quantity + 1,
@@ -88,9 +123,10 @@ export default function POS() {
         {
           id: item.id,
           name: item.name,
+          variant,
           quantity: 1,
-          unitPrice: item.price,
-          totalPrice: item.price,
+          unitPrice,
+          totalPrice: unitPrice,
         },
       ];
     });
@@ -149,11 +185,20 @@ export default function POS() {
       return;
     }
 
+    if (orderType === "delivery" && !deliveryArea) {
+      return;
+    }
+
     setPlacing(true);
     try {
+      const digitsOnlyPhone = phone.replace(/\D/g, "");
+      const fallbackPhone = "0000000";
+      const normalizedPhone = digitsOnlyPhone.length >= 7 ? digitsOnlyPhone : fallbackPhone;
+
       const addressParts =
         orderType === "delivery"
           ? [
+              deliveryArea && `Area: ${deliveryArea}`,
               flatNo && `Flat: ${flatNo}`,
               roomNo && `Room: ${roomNo}`,
               landmark && `Landmark: ${landmark}`,
@@ -165,11 +210,12 @@ export default function POS() {
 
       const payload = {
         customerName: customerName.trim() || (orderType === "dine-in" ? "Walk-in Guest" : "Takeaway Guest"),
-        phone: phone.trim() || "N/A",
+        phone: normalizedPhone,
         address: addressParts.join(", "),
+        paymentMethod,
         items: cart.map((item) => ({
           name: item.name,
-          variant: "Regular",
+          variant: item.variant,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
@@ -186,7 +232,18 @@ export default function POS() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Failed to place order");
+      if (!response.ok) {
+        let message = "Failed to place order";
+        try {
+          const data = await response.json();
+          if (typeof data?.message === "string" && data.message.trim()) {
+            message = data.message;
+          }
+        } catch {
+          // no-op
+        }
+        throw new Error(message);
+      }
 
       if (orderType === "dine-in" && selectedTableId) {
         const updatedTables = getStoredTables().map((table) =>
@@ -202,6 +259,8 @@ export default function POS() {
       setRoomNo("");
       setLandmark("");
       setAutoLocation("");
+      setDeliveryArea("");
+      setPaymentMethod("Cash");
       setSelectedTableId(null);
       setSavedAt(null);
     } finally {
@@ -215,10 +274,12 @@ export default function POS() {
       selectedTableId,
       customerName,
       phone,
+      deliveryArea,
       flatNo,
       roomNo,
       landmark,
       autoLocation,
+      paymentMethod,
       cart,
       subtotal,
       deliveryCharge,
@@ -236,16 +297,31 @@ export default function POS() {
     const orderNo = `CBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
     const customerLabel = customerName.trim() || (orderType === "dine-in" ? "Walk-in Guest" : "Takeaway Guest");
     const phoneLabel = phone.trim() || "N/A";
-    const tableLabel =
-      orderType === "dine-in"
-        ? tables.find((table) => table.id === selectedTableId)?.name || "Not selected"
-        : "-";
+    const tableLabel = tables.find((table) => table.id === selectedTableId)?.name || "Not selected";
+    const deliveryAddressLabel = [
+      deliveryArea && `Area: ${deliveryArea}`,
+      flatNo && `Flat: ${flatNo}`,
+      roomNo && `Room: ${roomNo}`,
+      landmark && `Landmark: ${landmark}`,
+      autoLocation && `Location: ${autoLocation}`,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const locationTitle =
+      orderType === "delivery" ? "Delivery Address" : orderType === "takeaway" ? "Pickup" : "Table";
+    const locationValue =
+      orderType === "delivery"
+        ? deliveryAddressLabel || "Not provided"
+        : orderType === "takeaway"
+          ? "Counter pickup"
+          : tableLabel;
 
     const rowsHtml = cart
       .map(
         (item) => `
           <tr>
             <td class="item-name">${item.name}</td>
+            <td>${item.variant}</td>
             <td class="num">${item.quantity}</td>
             <td class="num">${item.unitPrice.toFixed(2)}</td>
             <td class="num">${item.totalPrice.toFixed(2)}</td>
@@ -254,7 +330,7 @@ export default function POS() {
       )
       .join("");
 
-    const logoUrl = new URL(`${import.meta.env.BASE_URL}logo.jpeg`, window.location.origin).toString();
+    const logoUrl = new URL(`${import.meta.env.BASE_URL}logo.png`, window.location.origin).toString();
 
     const printWindow = window.open("", "_blank", "width=430,height=780");
     if (!printWindow) return;
@@ -264,7 +340,7 @@ export default function POS() {
       <html>
         <head>
           <meta charset="UTF-8" />
-          <title>Chkhna By Kilo E-Bill</title>
+          <title>Veg Spicy Hut E-Bill</title>
           <style>
             @page { size: 80mm auto; margin: 6mm; }
             * { box-sizing: border-box; }
@@ -343,8 +419,8 @@ export default function POS() {
         <body>
           <div class="bill">
             <div class="center">
-              <img src="${logoUrl}" alt="Chkhna By Kilo" class="logo" />
-              <h1>Chkhna By Kilo</h1>
+              <img src="${logoUrl}" alt="Veg Spicy Hut" class="logo" />
+              <h1>Veg Spicy Hut</h1>
               <div class="muted">E-BILL / TAX INVOICE</div>
             </div>
 
@@ -354,7 +430,8 @@ export default function POS() {
               <div><strong>Order No:</strong> ${orderNo}</div>
               <div><strong>Date:</strong> ${now.toLocaleDateString()} ${now.toLocaleTimeString()}</div>
               <div><strong>Type:</strong> ${orderType.toUpperCase()}</div>
-              <div><strong>Table:</strong> ${tableLabel}</div>
+              <div><strong>Payment:</strong> ${paymentMethod}</div>
+              <div><strong>${locationTitle}:</strong> ${locationValue}</div>
               <div><strong>Customer:</strong> ${customerLabel}</div>
               <div><strong>Phone:</strong> ${phoneLabel}</div>
             </div>
@@ -365,6 +442,7 @@ export default function POS() {
               <thead>
                 <tr>
                   <th>Item</th>
+                  <th>Var</th>
                   <th class="num">Qty</th>
                   <th class="num">Rate</th>
                   <th class="num">Amt</th>
@@ -385,7 +463,7 @@ export default function POS() {
 
             <div class="footer">
               <div>Thank you for dining with us!</div>
-              <div>By Kilo By Choice By Taste</div>
+              <div>Fresh Taste. Fast Service.</div>
             </div>
           </div>
 
@@ -430,15 +508,34 @@ export default function POS() {
         <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search in menu" />
 
         <div className="flex-1 overflow-y-auto pr-1">
+          {menuGroups.length === 0 && (
+            <Card className="mb-4 p-4 border-amber-200 bg-amber-50/60">
+              <p className="text-sm font-medium">All menu items were cleared.</p>
+              <p className="text-sm text-muted-foreground">Menu source is loaded from menu.jpeg.</p>
+              <img src={menuImageUrl} alt="Menu source" className="mt-3 w-full rounded-lg border object-contain max-h-[420px] bg-white" />
+            </Card>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredItems.map((item) => (
               <Card key={item.id} className="overflow-hidden">
                 <img src={item.image} alt={item.name} className="w-full h-32 object-cover" />
                 <div className="p-3 space-y-2">
                   <h3 className="font-semibold">{item.name}</h3>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline">Rs {item.price}</Badge>
-                    <Button onClick={() => addToCart(item)} size="sm">Add</Button>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {Object.entries(item.prices || {}).map(([variant, amount]) => (
+                      <Badge key={`${item.id}-${variant}`} variant="outline">{variant}: Rs {amount}</Badge>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {Object.entries(item.prices || {}).length > 0 ? (
+                      Object.entries(item.prices || {}).map(([variant]) => (
+                        <Button key={`${item.id}-add-${variant}`} onClick={() => addToCart(item, variant)} size="sm">
+                          Add {variant}
+                        </Button>
+                      ))
+                    ) : (
+                      <Button onClick={() => addToCart(item)} size="sm">Add</Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -447,8 +544,9 @@ export default function POS() {
         </div>
       </div>
 
-      <Card className="w-[420px] flex flex-col overflow-hidden border-blue-200 shadow-xl shadow-blue-200/30 bg-gradient-to-b from-blue-50/50 to-white">
-        <div className="p-4 border-b bg-blue-100/60 space-y-3">
+      <Card className="w-[420px] h-full min-h-0 flex flex-col overflow-hidden border-blue-200 shadow-xl shadow-blue-200/30 bg-gradient-to-b from-blue-50/50 to-white">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-4 border-b bg-blue-100/60 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-foreground font-bold">
               <ShoppingCart className="w-5 h-5 text-primary" />
@@ -461,6 +559,12 @@ export default function POS() {
             <Button variant={orderType === "dine-in" ? "default" : "outline"} onClick={() => setOrderType("dine-in")}>Dine-in</Button>
             <Button variant={orderType === "takeaway" ? "default" : "outline"} onClick={() => setOrderType("takeaway")}>Takeaway</Button>
             <Button variant={orderType === "delivery" ? "default" : "outline"} onClick={() => setOrderType("delivery")}>Delivery</Button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant={paymentMethod === "Cash" ? "default" : "outline"} onClick={() => setPaymentMethod("Cash")}>Cash</Button>
+            <Button variant={paymentMethod === "GPay" ? "default" : "outline"} onClick={() => setPaymentMethod("GPay")}>GPay</Button>
+            <Button variant={paymentMethod === "PhonePe" ? "default" : "outline"} onClick={() => setPaymentMethod("PhonePe")}>PhonePe</Button>
           </div>
 
           {orderType === "dine-in" && (
@@ -491,8 +595,22 @@ export default function POS() {
             placeholder="Phone"
           />
 
-          {orderType === "delivery" && (
-            <div className="space-y-2">
+            {orderType === "delivery" && (
+              <div className="space-y-2.5">
+              <p className="text-xs font-semibold text-blue-900">Delivery Area</p>
+              <select
+                className="w-full h-10 rounded-md border border-blue-300 bg-white px-3 text-sm"
+                value={deliveryArea}
+                onChange={(event) => setDeliveryArea(event.target.value as DeliveryArea | "")}
+              >
+                <option value="" disabled>
+                  Select delivery area
+                </option>
+                <option value="DLF">DLF</option>
+                <option value="PS Group">PS Group</option>
+                <option value="Elita">Elita</option>
+                <option value="Shapoorji Sukhobrishti">Shapoorji Sukhobrishti</option>
+              </select>
               <Input value={flatNo} onChange={(event) => setFlatNo(event.target.value)} placeholder="Flat No" />
               <Input value={roomNo} onChange={(event) => setRoomNo(event.target.value)} placeholder="Room No" />
               <Input value={landmark} onChange={(event) => setLandmark(event.target.value)} placeholder="Nearby Landmark" />
@@ -500,31 +618,47 @@ export default function POS() {
                 <Input value={autoLocation} onChange={(event) => setAutoLocation(event.target.value)} placeholder="Auto location / map location" />
                 <Button type="button" variant="outline" onClick={useAutoLocation}>Auto</Button>
               </div>
-            </div>
-          )}
+              <div className="rounded-lg border border-blue-300 bg-blue-100/70 px-3 py-3 text-sm text-blue-950 shadow-sm space-y-2">
+                <p className="font-bold tracking-tight">Delivery Terms & Conditions</p>
+                <ul className="list-disc pl-5 space-y-1 leading-5">
+                  <li>DLF, PS Group, Elita: fixed delivery charge Rs 20.</li>
+                  <li>Shapoorji Sukhobrishti: Rs 20 if subtotal is below Rs 200, free delivery at Rs 200 or above.</li>
+                </ul>
+                <div className="rounded-md border border-blue-400 bg-white/80 px-2.5 py-2 font-semibold text-blue-900">
+                  Applied rule: {deliveryTermsMessage}
+                </div>
+              </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 space-y-3 bg-[#f7fcff]">
+            {cart.length === 0 && <p className="text-muted-foreground">Cart is empty</p>}
+            {cart.map((item) => (
+              <div key={item.id} className="rounded-xl border border-blue-200 p-3 bg-white flex items-center justify-between gap-3 shadow-sm">
+                <div>
+                  <p className="font-semibold">{item.name} ({item.variant})</p>
+                  <p className="text-sm text-muted-foreground">Rs {item.unitPrice} each</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, -1)}>-</Button>
+                  <span className="w-5 text-center">{item.quantity}</span>
+                  <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, 1)}>+</Button>
+                </div>
+                <p className="font-semibold">Rs {item.totalPrice}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f7fcff]">
-          {cart.length === 0 && <p className="text-muted-foreground">Cart is empty</p>}
-          {cart.map((item) => (
-            <div key={item.id} className="rounded-xl border border-blue-200 p-3 bg-white flex items-center justify-between gap-3 shadow-sm">
-              <div>
-                <p className="font-semibold">{item.name}</p>
-                <p className="text-sm text-muted-foreground">Rs {item.unitPrice} each</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, -1)}>-</Button>
-                <span className="w-5 text-center">{item.quantity}</span>
-                <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, 1)}>+</Button>
-              </div>
-              <p className="font-semibold">Rs {item.totalPrice}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="p-4 border-t bg-blue-50 space-y-2">
+        <div className="p-4 border-t bg-blue-50 space-y-2 shrink-0">
           <div className="flex justify-between text-sm"><span>Subtotal</span><span>Rs {subtotal.toFixed(2)}</span></div>
           <div className="flex justify-between text-sm"><span>Delivery</span><span>Rs {deliveryCharge.toFixed(2)}</span></div>
+          {orderType === "delivery" && (
+            <div className="rounded-md border border-blue-200 bg-white px-2.5 py-2 text-sm text-blue-900">
+              {deliveryTermsMessage}
+            </div>
+          )}
           <div className="flex justify-between font-bold text-lg border-t pt-2"><span>Total</span><span>Rs {total.toFixed(2)}</span></div>
 
           <Button type="button" variant="outline" onClick={saveAndPrintBill} disabled={cart.length === 0}>
@@ -541,6 +675,7 @@ export default function POS() {
               (orderType === "delivery" && !customerName.trim()) ||
               (orderType === "delivery" && !phone.trim()) ||
               (orderType === "dine-in" && !selectedTableId) ||
+              (orderType === "delivery" && !deliveryArea) ||
               (orderType === "delivery" && !flatNo.trim() && !autoLocation.trim())
             }
           >

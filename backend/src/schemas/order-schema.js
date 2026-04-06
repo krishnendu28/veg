@@ -16,6 +16,7 @@ export const createOrderSchema = z.object({
   customerName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(7).max(25),
   address: z.string().trim().min(5).max(300),
+  paymentMethod: z.enum(["Cash", "GPay", "PhonePe"]).default("Cash"),
   items: z.array(orderItemSchema).min(1),
   total: z.coerce.number().nonnegative(),
   deliveryCharge: z.coerce.number().nonnegative().default(0),

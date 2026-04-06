@@ -2,14 +2,12 @@ import dotenv from "dotenv";
 import http from "http";
 import mongoose from "mongoose";
 import app from "./src/app.js";
-import { initSocket } from "./src/config/socket.js";
 import { setMongoEnabled } from "./src/services/orderService.js";
 import { logger } from "./src/utils/logger.js";
 
 dotenv.config();
 
 const server = http.createServer(app);
-initSocket(server);
 
 const PORT = Number(process.env.PORT) || 5000;
 const MONGO_URI = process.env.MONGO_URI;

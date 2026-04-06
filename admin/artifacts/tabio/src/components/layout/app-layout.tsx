@@ -25,7 +25,6 @@ const NAV_ICON_MAP = {
   "/inventory": Store,
   "/customers": Users,
   "/reports": BarChart3,
-  "/aggregators": Package,
   "/live-orders": ShoppingCart,
   "/staff": UserCircle,
   "/settings": Settings,
@@ -38,24 +37,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const logout = useLogout();
   const queryClient = useQueryClient();
 
+  const finalizeLocalLogout = () => {
+    localStorage.removeItem(DEMO_OWNER_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    queryClient.setQueryData(getGetMeQueryKey(), null);
+    queryClient.clear();
+    window.dispatchEvent(new Event("cbk-demo-auth-changed"));
+    setLocation("/login");
+  };
+
   const handleLogout = () => {
     if (DEMO_AUTH) {
-      localStorage.removeItem(DEMO_OWNER_KEY);
-      localStorage.removeItem(TOKEN_KEY);
-      window.dispatchEvent(new Event("cbk-demo-auth-changed"));
-      queryClient.clear();
-      setLocation("/login");
+      finalizeLocalLogout();
       return;
     }
 
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        localStorage.removeItem(TOKEN_KEY);
-        queryClient.setQueryData(getGetMeQueryKey(), null);
-        queryClient.clear();
-        setLocation("/login");
-      }
-    });
+    // Sign out locally first so UI always exits reliably even if API is unavailable.
+    finalizeLocalLogout();
+    logout.mutate(undefined);
   };
 
   if (isLoading) {
@@ -63,11 +62,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <img
-            src={`${import.meta.env.BASE_URL}logo.jpeg`}
-            alt="Chkhna By Kilo Logo"
-            className="w-12 h-12 rounded-2xl object-cover shadow-lg animate-pulse"
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Veg Spicy Hut Logo"
+            className="w-12 h-12 rounded-2xl object-contain bg-white p-1.5 border border-blue-200 shadow-lg animate-pulse"
           />
-          <p className="text-foreground text-sm font-semibold">Loading Chkhna By Kilo Admin...</p>
+          <p className="text-foreground text-sm font-semibold">Loading Veg Spicy Hut Admin...</p>
         </div>
       </div>
     );
@@ -88,11 +87,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl z-20 hidden md:flex">
         <div className="p-6 flex items-center gap-3">
           <img
-            src={`${import.meta.env.BASE_URL}logo.jpeg`}
-            alt="Chkhna By Kilo Logo"
-            className="w-10 h-10 rounded-xl shadow-lg object-cover"
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Veg Spicy Hut Logo"
+            className="w-11 h-11 rounded-xl object-contain bg-white p-1 border border-blue-200 shadow-lg"
           />
-          <span className="font-display font-extrabold text-[1.45rem] tracking-tight text-white">Chkhna By Kilo</span>
+          <span className="font-display font-extrabold text-[1.45rem] tracking-tight text-white">Veg Spicy Hut</span>
         </div>
         
         <nav className="flex-1 px-4 pb-4 space-y-1 overflow-y-auto custom-scrollbar">
@@ -145,9 +144,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
             <img
-              src={`${import.meta.env.BASE_URL}logo.jpeg`}
-              alt="Chkhna By Kilo Logo"
-              className="w-9 h-9 rounded-lg object-cover border border-blue-200"
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt="Veg Spicy Hut Logo"
+              className="w-10 h-10 rounded-xl object-contain bg-white p-1 border border-blue-200 shadow-sm"
             />
             <h1 className="text-xl font-display font-bold text-foreground truncate">
               {allowedNavItems.find(i => location === i.href || (i.href !== "/" && location.startsWith(i.href)))?.label || "Dashboard"}

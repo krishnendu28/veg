@@ -35,7 +35,7 @@ export function isMongoEnabled() {
   return useMongo;
 }
 
-export async function createOrder({ customerName, phone, address, items, total, deliveryCharge }) {
+export async function createOrder({ customerName, phone, address, paymentMethod, items, total, deliveryCharge }) {
   const normalizedItems = items.map((item) => ({
     name: item.name,
     variant: item.variant || "Regular",
@@ -48,6 +48,7 @@ export async function createOrder({ customerName, phone, address, items, total, 
     customerName,
     phone,
     address,
+    paymentMethod: ["Cash", "GPay", "PhonePe"].includes(String(paymentMethod)) ? String(paymentMethod) : "Cash",
     items: normalizedItems,
     total: Number(total) || 0,
     deliveryCharge: Number(deliveryCharge) || 0,

@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { io } from "socket.io-client";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://cbk-4dmf.onrender.com";
-const BRAND_LOGO_URL = import.meta.env.VITE_BRAND_LOGO_URL || `${API_BASE_URL}/logo.jpeg`;
-const socket = io(API_BASE_URL);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const BRAND_LOGO_URL = import.meta.env.VITE_BRAND_LOGO_URL || "/logo.jpeg";
 const statuses = ["Preparing", "Ready", "Delivered"];
 const OWNER_SESSION_KEY = "cbk_owner_session";
 
@@ -42,22 +40,8 @@ function App() {
     loadOrders();
     const pollId = window.setInterval(loadOrders, 8000);
 
-    socket.on("new_order", (order) => {
-      setOrders((prev) => [order, ...prev]);
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => undefined);
-      }
-    });
-
-    socket.on("order_updated", (updated) => {
-      setOrders((prev) => prev.map((order) => (order._id === updated._id ? updated : order)));
-    });
-
     return () => {
       window.clearInterval(pollId);
-      socket.off("new_order");
-      socket.off("order_updated");
     };
   }, [isOwnerLoggedIn]);
 
@@ -73,8 +57,8 @@ function App() {
 
   const handleOwnerLogin = (event) => {
     event.preventDefault();
-    if (ownerCreds.username.trim().toLowerCase() !== "owner" || ownerCreds.password !== "chakhna123") {
-      window.alert("Invalid owner credentials. Use owner / chakhna123");
+    if (ownerCreds.username.trim().toLowerCase() !== "owner" || ownerCreds.password !== "vegspicy123") {
+      window.alert("Invalid owner credentials. Use owner / vegspicy123");
       return;
     }
     localStorage.setItem(OWNER_SESSION_KEY, "1");
@@ -102,7 +86,7 @@ function App() {
     return (
       <div className="admin-login-screen">
         <div className="admin-login-card">
-          <img src={BRAND_LOGO_URL} alt="Chakhna logo" className="admin-login-logo" />
+          <img src={BRAND_LOGO_URL} alt="Veg Spicy Hut logo" className="admin-login-logo" />
           <h1>Owner Login</h1>
           <p>Sign in to manage live orders and kitchen tickets.</p>
           <form className="admin-login-form" onSubmit={handleOwnerLogin}>
@@ -131,8 +115,8 @@ function App() {
 
       <header className="admin-header">
         <div>
-          <h1>Chakhna Admin Dashboard</h1>
-          <p>Live orders from user app + real-time kitchen feed</p>
+          <h1>Veg Spicy Hut Admin Dashboard</h1>
+          <p>Orders and kitchen feed (polling mode)</p>
           {loadError ? <p style={{ color: "#ff9b9b", marginTop: 6 }}>{loadError}</p> : null}
         </div>
 

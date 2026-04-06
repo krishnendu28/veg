@@ -16,6 +16,11 @@ const orderSchema = new mongoose.Schema(
     customerName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "GPay", "PhonePe"],
+      default: "Cash",
+    },
     items: { type: [orderItemSchema], required: true },
     total: { type: Number, required: true, min: 0 },
     deliveryCharge: { type: Number, default: 0, min: 0 },

@@ -12,6 +12,10 @@ import {
   subscribeBridgeOrders,
 } from "@/lib/bridge";
 
+function getPaymentMethodLabel(paymentMethod?: string) {
+  return paymentMethod && paymentMethod.trim() ? paymentMethod : "Cash";
+}
+
 export default function KitchenDisplay() {
   const [orders, setOrders] = useState<BridgeOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,10 +92,13 @@ export default function KitchenDisplay() {
                       Kitchen Ticket • {order.status}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="flex items-center gap-1 font-mono">
-                    <Clock className="w-3 h-3" />
-                    {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1 font-mono">
+                      <Clock className="w-3 h-3" />
+                      {new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Badge>
+                    <Badge variant="outline">{getPaymentMethodLabel(order.paymentMethod)}</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-y-auto">

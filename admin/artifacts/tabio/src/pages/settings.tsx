@@ -42,10 +42,6 @@ export default function Settings() {
           currencySymbol: draftSettings.currencySymbol,
           receiptFooter: draftSettings.receiptFooter,
           printKotAutomatically: draftSettings.printKotAutomatically,
-          zomatoEnabled: draftSettings.zomatoEnabled,
-          swiggyEnabled: draftSettings.swiggyEnabled,
-          zomatoApiKey: draftSettings.zomatoApiKey ?? null,
-          swiggyApiKey: draftSettings.swiggyApiKey ?? null,
           carbonTrackingEnabled: draftSettings.carbonTrackingEnabled,
         },
       });
@@ -67,7 +63,7 @@ export default function Settings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold">Outlet Settings</h1>
-          <p className="text-muted-foreground">Configure taxes, printing, and integrations</p>
+          <p className="text-muted-foreground">Configure taxes, printing, and billing defaults</p>
         </div>
         <Button
           className="rounded-xl shadow-md"
@@ -143,37 +139,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Integrations</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-base">Zomato Sync</Label>
-                <p className="text-sm text-muted-foreground">Receive orders from Zomato</p>
-              </div>
-              <Switch
-                checked={draftSettings.zomatoEnabled}
-                onCheckedChange={(checked) =>
-                  setDraftSettings((prev) => (prev ? { ...prev, zomatoEnabled: checked } : prev))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between border-t pt-6">
-              <div>
-                <Label className="text-base">Swiggy Sync</Label>
-                <p className="text-sm text-muted-foreground">Receive orders from Swiggy</p>
-              </div>
-              <Switch
-                checked={draftSettings.swiggyEnabled}
-                onCheckedChange={(checked) =>
-                  setDraftSettings((prev) => (prev ? { ...prev, swiggyEnabled: checked } : prev))
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

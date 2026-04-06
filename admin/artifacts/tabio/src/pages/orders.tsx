@@ -16,6 +16,10 @@ import {
   subscribeBridgeOrders,
 } from "@/lib/bridge";
 
+function getPaymentMethodLabel(paymentMethod?: string) {
+  return paymentMethod && paymentMethod.trim() ? paymentMethod : "Cash";
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState<BridgeOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +108,7 @@ export default function Orders() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -118,6 +123,9 @@ export default function Orders() {
                   <TableCell>{order.customerName}</TableCell>
                   <TableCell>{order.phone}</TableCell>
                   <TableCell className="font-bold">Rs {order.total}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{getPaymentMethodLabel(order.paymentMethod)}</Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={`capitalize ${getStatusColor(order.status)}`}>
                       {order.status}
@@ -154,7 +162,7 @@ export default function Orders() {
               ))}
               {orders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                     No orders found.
                   </TableCell>
                 </TableRow>
@@ -197,6 +205,10 @@ export default function Orders() {
                 <div>
                   <p className="text-muted-foreground">Phone</p>
                   <p className="font-medium">{selectedOrder.phone}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Payment</p>
+                  <p className="font-medium">{getPaymentMethodLabel(selectedOrder.paymentMethod)}</p>
                 </div>
               </div>
 

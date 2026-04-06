@@ -21,7 +21,6 @@ import Tables from "@/pages/tables";
 import Inventory from "@/pages/inventory";
 import Reports from "@/pages/reports";
 import Customers from "@/pages/customers";
-import Aggregators from "@/pages/aggregators";
 import Settings from "@/pages/settings";
 import Staff from "@/pages/staff";
 import LiveOrders from "@/pages/live-orders";
@@ -72,7 +71,6 @@ function Router() {
       <Route path="/inventory"><ProtectedRoute path="/inventory" component={Inventory} /></Route>
       <Route path="/reports"><ProtectedRoute path="/reports" component={Reports} /></Route>
       <Route path="/customers"><ProtectedRoute path="/customers" component={Customers} /></Route>
-      <Route path="/aggregators"><ProtectedRoute path="/aggregators" component={Aggregators} /></Route>
       <Route path="/live-orders"><ProtectedRoute path="/live-orders" component={LiveOrders} /></Route>
       <Route path="/settings"><ProtectedRoute path="/settings" component={Settings} /></Route>
       <Route path="/staff"><ProtectedRoute path="/staff" component={Staff} /></Route>

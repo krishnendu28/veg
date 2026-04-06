@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
 import {
-  createBridgeMenuItem,
   deleteBridgeMenuItem,
   fetchBridgeMenuGroups,
   getBridgeMenuGroups,
@@ -15,12 +14,12 @@ import {
 
 export default function MenuManagement() {
   const [menuGroups, setMenuGroups] = useState(getBridgeMenuGroups);
-  const [activeGroupId, setActiveGroupId] = useState(menuGroups[0]?.id || "non-veg-chakhna");
+  const [activeGroupId, setActiveGroupId] = useState(menuGroups[0]?.id || "");
+  const [search, setSearch] = useState("");
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [image, setImage] = useState("");
-  const [categoryTitle, setCategoryTitle] = useState(menuGroups[0]?.title || "");
+  const [editingName, setEditingName] = useState("");
+  const [editingPrices, setEditingPrices] = useState("");
+
   const activeGroup = menuGroups.find((group) => group.id === activeGroupId) || menuGroups[0];
 
   async function reloadMenu() {
@@ -32,93 +31,100 @@ export default function MenuManagement() {
   }
 
   useEffect(() => {
-    reloadMenu();
+    void reloadMenu();
     return subscribeBridgeMenu(() => {
-      reloadMenu();
+      void reloadMenu();
     });
   }, []);
 
-  useEffect(() => {
-    if (activeGroup?.title) {
-      setCategoryTitle(activeGroup.title);
-    }
-  }, [activeGroup?.id]);
+  const filteredItems = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return activeGroup?.items || [];
+    return (activeGroup?.items || []).filter((item) => item.name.toLowerCase().includes(needle));
+  }, [activeGroup?.items, search]);
 
-  async function handleDeleteItem(itemId: number, itemName: string) {
-    const ok = window.confirm(`Delete menu item "${itemName}" from admin menu?`);
-    if (!ok) return;
-
-    await deleteBridgeMenuItem(itemId);
-    await reloadMenu();
+  function formatPrices(prices: Record<string, number>) {
+    const entries = Object.entries(prices || {}).filter(([, value]) => Number.isFinite(Number(value)));
+    if (entries.length === 0) return "Rs 0";
+    return entries.map(([variant, value]) => `${variant}: Rs ${Number(value)}`).join(" | ");
   }
 
-  function startEdit(item: { id: number; name: string; price: number; image: string }, groupTitle: string) {
+  function parsePriceText(text: string) {
+    const parts = text
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    const nextPrices: Record<string, number> = {};
+    for (const part of parts) {
+      const [variantRaw, amountRaw] = part.split(":").map((s) => s.trim());
+      if (!variantRaw || !amountRaw) return null;
+      const cleaned = amountRaw.replace(/rs\.?/gi, "").replace(/\/-/g, "").replace(/[^0-9.\-]/g, "").trim();
+      const amount = Number(cleaned);
+      if (!Number.isFinite(amount) || amount < 0) return null;
+      nextPrices[variantRaw] = amount;
+    }
+
+    return Object.keys(nextPrices).length > 0 ? nextPrices : null;
+  }
+
+  function startEdit(item: { id: number; name: string; prices: Record<string, number> }) {
     setEditingItemId(item.id);
-    setName(item.name);
-    setPrice(String(item.price));
-    setImage(item.image || "");
-    setCategoryTitle(groupTitle);
+    setEditingName(item.name);
+    const priceText = Object.entries(item.prices || {})
+      .map(([variant, amount]) => `${variant}:${amount}`)
+      .join(", ");
+    setEditingPrices(priceText);
   }
 
-  function resetForm() {
-    setEditingItemId(null);
-    setName("");
-    setPrice("");
-    setImage("");
-    setCategoryTitle(activeGroup?.title || "");
-  }
+  async function saveEdit() {
+    if (!editingItemId) return;
+    if (!editingName.trim()) return;
 
-  async function submitMenuItem() {
-    if (!name.trim() || !categoryTitle.trim()) return;
-    const numericPrice = Number(price || 0);
-    if (!Number.isFinite(numericPrice) || numericPrice < 0) return;
-
-    if (editingItemId) {
-      await updateBridgeMenuItem(editingItemId, {
-        name: name.trim(),
-        price: numericPrice,
-        image: image.trim() || undefined,
-        categoryId: activeGroup?.title === categoryTitle.trim() ? activeGroup?.id : undefined,
-        categoryTitle: categoryTitle.trim(),
-      });
-    } else {
-      await createBridgeMenuItem({
-        categoryId: activeGroup?.title === categoryTitle.trim() ? activeGroup?.id : undefined,
-        categoryTitle: categoryTitle.trim(),
-        name: name.trim(),
-        price: numericPrice,
-        image: image.trim() || undefined,
-      });
+    const parsed = parsePriceText(editingPrices);
+    if (!parsed) {
+      window.alert("Use format like Full:200, Half:110 or Regular:90. You can also write Rs 200/-.");
+      return;
     }
 
-    await reloadMenu();
-    resetForm();
+    try {
+      await updateBridgeMenuItem(editingItemId, {
+        name: editingName.trim(),
+        prices: parsed,
+      });
+
+      setEditingItemId(null);
+      setEditingName("");
+      setEditingPrices("");
+      await reloadMenu();
+      window.alert("Menu item saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save menu item";
+      window.alert(message);
+    }
+  }
+
+  async function removeItem(itemId: number, itemName: string) {
+    const ok = window.confirm(`Delete menu item "${itemName}"?`);
+    if (!ok) return;
+    try {
+      await deleteBridgeMenuItem(itemId);
+      await reloadMenu();
+      window.alert("Menu item deleted.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete menu item";
+      window.alert(message);
+    }
   }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Menu Management</h1>
-          <p className="text-muted-foreground">Add, update, and delete menu items. User side uses the same menu source.</p>
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-display font-bold">Menu Items</h1>
+        <p className="text-sm text-muted-foreground">Only food items with prices. Update or delete any item.</p>
       </div>
 
-      <Card className="p-4 space-y-3 border-blue-200 bg-blue-50/40">
-        <h2 className="font-semibold">{editingItemId ? "Update Menu Item" : "Add Menu Item"}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Input placeholder="Food Name" value={name} onChange={(event) => setName(event.target.value)} />
-          <Input placeholder="Price" type="number" value={price} onChange={(event) => setPrice(event.target.value)} />
-          <Input placeholder="Category (e.g. Main Course)" value={categoryTitle} onChange={(event) => setCategoryTitle(event.target.value)} />
-          <Input placeholder="Image URL (optional)" value={image} onChange={(event) => setImage(event.target.value)} />
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={submitMenuItem}>{editingItemId ? "Update Item" : "Add Item"}</Button>
-          {editingItemId && (
-            <Button variant="outline" onClick={resetForm}>Cancel</Button>
-          )}
-        </div>
-      </Card>
+      <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search food item" />
 
       <div className="flex flex-wrap gap-2">
         {menuGroups.map((group) => (
@@ -137,34 +143,55 @@ export default function MenuManagement() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {activeGroup?.items.map((item) => (
-          <Card key={item.id} className="overflow-hidden">
-            <img src={item.image} alt={item.name} className="w-full h-40 object-cover" />
-            <div className="p-4 space-y-2">
-              <h3 className="font-semibold text-lg">{item.name}</h3>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline">{activeGroup.title}</Badge>
-                <p className="font-bold text-primary">Rs {item.price}</p>
-              </div>
-              <Button variant="outline" size="sm" className="w-full" onClick={() => startEdit(item, activeGroup.title)}>
-                Update
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="w-full"
-                onClick={() => handleDeleteItem(item.id, item.name)}
-              >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
-              </Button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filteredItems.map((item) => (
+          <Card key={item.id} className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-lg leading-tight">{item.name}</h3>
+              <Badge variant="outline">{activeGroup?.title || "Menu"}</Badge>
             </div>
+
+            {editingItemId === item.id ? (
+              <div className="space-y-2">
+                <Input value={editingName} onChange={(event) => setEditingName(event.target.value)} placeholder="Item name" />
+                <Input
+                  value={editingPrices}
+                  onChange={(event) => setEditingPrices(event.target.value)}
+                  placeholder="Full:200, Half:110"
+                />
+                <p className="text-xs text-muted-foreground">Format: Variant:Price, Variant:Price</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveEdit}>Save</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingItemId(null);
+                      setEditingName("");
+                      setEditingPrices("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="font-medium text-primary">{formatPrices(item.prices)}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => startEdit(item)}>Update</Button>
+                  <Button size="sm" variant="destructive" onClick={() => removeItem(item.id, item.name)}>
+                    <Trash2 className="w-4 h-4 mr-1" /> Delete
+                  </Button>
+                </div>
+              </>
+            )}
           </Card>
         ))}
       </div>
 
-      {menuGroups.length === 0 && (
-        <Card className="p-6 text-center text-muted-foreground">No menu items left. Reload data source to restore.</Card>
+      {filteredItems.length === 0 && (
+        <Card className="p-6 text-center text-muted-foreground">No matching food items found.</Card>
       )}
     </div>
   );

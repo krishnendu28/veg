@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { io } from "socket.io-client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,6 @@ import { deleteBridgeOrder, patchBridgeOrderStatus, USER_BACKEND_URL } from "@/l
 import { toast } from "@/hooks/use-toast";
 import { Trash2 } from "lucide-react";
 
-const socket = io(USER_BACKEND_URL, { autoConnect: true });
 const statuses = ["Preparing", "Ready", "Delivered"] as const;
 
 type LiveOrderItem = {
@@ -23,12 +21,17 @@ type LiveOrder = {
   customerName: string;
   phone: string;
   address: string;
+  paymentMethod?: "Cash" | "GPay" | "PhonePe" | string;
   items: LiveOrderItem[];
   total: number;
   deliveryCharge?: number;
   status: (typeof statuses)[number];
   createdAt: string;
 };
+
+function getPaymentMethodLabel(paymentMethod?: string) {
+  return paymentMethod && paymentMethod.trim() ? paymentMethod : "Cash";
+}
 
 function formatINR(value: number) {
   return `Rs ${value}`;
@@ -56,23 +59,10 @@ export default function LiveOrders() {
     }
 
     loadOrders();
-
-    socket.on("new_order", (order: LiveOrder) => {
-      setOrders((prev) => [order, ...prev]);
-    });
-
-    socket.on("order_updated", (updatedOrder: LiveOrder) => {
-      setOrders((prev) => prev.map((order) => (order._id === updatedOrder._id ? updatedOrder : order)));
-    });
-
-    socket.on("order_deleted", (payload: { _id: string }) => {
-      setOrders((prev) => prev.filter((order) => order._id !== payload._id));
-    });
+    const pollId = window.setInterval(loadOrders, 8000);
 
     return () => {
-      socket.off("new_order");
-      socket.off("order_updated");
-      socket.off("order_deleted");
+      window.clearInterval(pollId);
     };
   }, []);
 
@@ -136,6 +126,7 @@ export default function LiveOrders() {
               <p><strong>Name:</strong> {order.customerName}</p>
               <p><strong>Phone:</strong> {order.phone}</p>
               <p><strong>Address:</strong> {order.address}</p>
+              <p><strong>Payment:</strong> {getPaymentMethodLabel(order.paymentMethod)}</p>
               <p><strong>Time:</strong> {new Date(order.createdAt).toLocaleString()}</p>
             </div>
 

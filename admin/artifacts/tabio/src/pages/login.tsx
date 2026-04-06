@@ -60,11 +60,11 @@ export default function Login() {
       <Card className="w-full max-w-md relative z-10 p-8 shadow-2xl bg-card/95 backdrop-blur-xl border-blue-200/70">
         <div className="flex flex-col items-center mb-8">
           <img
-            src={`${import.meta.env.BASE_URL}logo.jpeg`}
-            alt="Chkhna By Kilo Logo"
-            className="w-16 h-16 rounded-2xl shadow-lg object-cover mb-4"
+            src={`${import.meta.env.BASE_URL}logo.png`}
+            alt="Veg Spicy Hut Logo"
+            className="w-16 h-16 rounded-2xl shadow-lg object-contain bg-white p-1.5 border border-blue-200 mb-4"
           />
-          <h1 className="text-3xl font-display font-extrabold text-foreground">Chkhna By Kilo Admin</h1>
+          <h1 className="text-3xl font-display font-extrabold text-foreground">Veg Spicy Hut Admin</h1>
           <p className="text-foreground/85 mt-2 text-center font-medium">Sign in to manage POS, KOT, inventory, reports, and more.</p>
         </div>
 

@@ -9,7 +9,7 @@ const DEMO_OWNER_KEY = "cbk_tabio_demo_owner";
 const demoUser: User = {
   id: 1,
   email: "owner@tabio.com",
-  name: "Chakhna Owner",
+  name: "Veg Spicy Hut Owner",
   role: "owner",
   outletId: 1,
 };
@@ -17,8 +17,8 @@ const demoUser: User = {
 const demoOutlets: Outlet[] = [
   {
     id: 1,
-    name: "Chakhna By Kilo",
-    address: "Outside Shapoorji C Block Gate, Technocity (New Town), Kolkata - 700135",
+    name: "Veg Spicy Hut",
+    address: "New Town, Kolkata - 700135",
     phone: "+91-84202 52042",
     email: "owner@tabio.com",
     currency: "INR",
