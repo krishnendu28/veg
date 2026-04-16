@@ -29,7 +29,10 @@ type DeliveryArea = "DLF" | "PS Group" | "Elita" | "Shapoorji Sukhobrishti";
 const FIXED_CHARGE_AREAS: DeliveryArea[] = ["DLF", "PS Group", "Elita"];
 
 const VEG_SPICY_MENU_IMAGE_MAP: Array<{ keywords: string[]; path: string }> = [
-  { keywords: ["water bottle", "cold drinks", "drink", "beverage", "lassi", "chach"], path: "/VegSpicyMenu/Lassi.webp" },
+  { keywords: [ "lassi", "chach"], path: "/VegSpicyMenu/Lassi.webp" },
+  { keywords: [ "water bottle" ], path: "/VegSpicyMenu/waterbottle.avif" },
+  { keywords: [ "cold drinks", "drink", "beverage" ], path: "/VegSpicyMenu/colddrink.jpg" },
+  { keywords: [ "Ajwain Prantha" ], path: "/VegSpicyMenu/AjwainPrantha.jpg" },
   { keywords: ["aloo pyaaz", "pyaaz aloo"], path: "/VegSpicyMenu/AlooPyaazParantha.webp" },
   { keywords: ["aloo prantha", "aloo paratha"], path: "/VegSpicyMenu/AlooPrantha.jpg" },
   { keywords: ["pyaaz prantha", "onion prantha", "onion paratha"], path: "/VegSpicyMenu/PyaazPrantha.jpg" },
@@ -74,7 +77,7 @@ const VEG_SPICY_MENU_IMAGE_MAP: Array<{ keywords: string[]; path: string }> = [
 function resolveVegSpicyMenuImage(itemName: string, fallbackImage: string) {
   const normalized = String(itemName || "").toLowerCase();
   const matched = VEG_SPICY_MENU_IMAGE_MAP.find((entry) =>
-    entry.keywords.some((keyword) => normalized.includes(keyword)),
+    entry.keywords.some((keyword) => normalized.includes(String(keyword).toLowerCase())),
   );
 
   return matched?.path || fallbackImage;
