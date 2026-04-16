@@ -28,6 +28,58 @@ type DeliveryArea = "DLF" | "PS Group" | "Elita" | "Shapoorji Sukhobrishti";
 
 const FIXED_CHARGE_AREAS: DeliveryArea[] = ["DLF", "PS Group", "Elita"];
 
+const VEG_SPICY_MENU_IMAGE_MAP: Array<{ keywords: string[]; path: string }> = [
+  { keywords: ["water bottle", "cold drinks", "drink", "beverage", "lassi", "chach"], path: "/VegSpicyMenu/Lassi.webp" },
+  { keywords: ["aloo pyaaz", "pyaaz aloo"], path: "/VegSpicyMenu/AlooPyaazParantha.webp" },
+  { keywords: ["aloo prantha", "aloo paratha"], path: "/VegSpicyMenu/AlooPrantha.jpg" },
+  { keywords: ["pyaaz prantha", "onion prantha", "onion paratha"], path: "/VegSpicyMenu/PyaazPrantha.jpg" },
+  { keywords: ["masala lachha", "lacha paratha", "lachha paratha"], path: "/VegSpicyMenu/MasalaLachhaPrantha.jpg" },
+  { keywords: ["wheat lachha"], path: "/VegSpicyMenu/WheatLachhaPrantha.jpg" },
+  { keywords: ["plain prantha", "plain paratha"], path: "/VegSpicyMenu/PlainPrantha.jpg" },
+  { keywords: ["plain roti"], path: "/VegSpicyMenu/PlainRoti.jpg" },
+  { keywords: ["butter roti"], path: "/VegSpicyMenu/ButterRoti.webp" },
+  { keywords: ["paneer makhani"], path: "/VegSpicyMenu/PaneerMakhani.jpg" },
+  { keywords: ["paneer bhurji"], path: "/VegSpicyMenu/PaneerBhurji.jpg" },
+  { keywords: ["palak paneer"], path: "/VegSpicyMenu/PalakPaneer.jpg" },
+  { keywords: ["masala chole", "chole"], path: "/VegSpicyMenu/MasalaChole.jpg" },
+  { keywords: ["dal fry"], path: "/VegSpicyMenu/ButterDalFry.jpg" },
+  { keywords: ["kadhi pakora"], path: "/VegSpicyMenu/KadhiPakora.jpg" },
+  { keywords: ["veg handi"], path: "/VegSpicyMenu/VegHandi.jpg" },
+  { keywords: ["dry mix veg"], path: "/VegSpicyMenu/DryMixVeg.jpg" },
+  { keywords: ["jeera aloo"], path: "/VegSpicyMenu/JeeraAloo.jpg" },
+  { keywords: ["masala mushroom"], path: "/VegSpicyMenu/MasalaMushroom.jpg" },
+  { keywords: ["masala chaap"], path: "/VegSpicyMenu/MasalaChaap.jpg" },
+  { keywords: ["creamy palak corn"], path: "/VegSpicyMenu/CreamyPalakCorn.jpg" },
+  { keywords: ["punjabi kali dal", "kali dal"], path: "/VegSpicyMenu/PanjabikaliDal.jpg" },
+  { keywords: ["kashmiri pulao"], path: "/VegSpicyMenu/KashmiriPulao.jpg" },
+  { keywords: ["tawa pulao"], path: "/VegSpicyMenu/SpecailTawaPulao.jpg" },
+  { keywords: ["veg pulao", "peas pulao"], path: "/VegSpicyMenu/VegPulao_PeasPulao.jpg" },
+  { keywords: ["jeera rice"], path: "/VegSpicyMenu/JeeraRice.jpg" },
+  { keywords: ["plain rice"], path: "/VegSpicyMenu/PlainRice.webp" },
+  { keywords: ["boondi raita"], path: "/VegSpicyMenu/BoondiRaita.jpg" },
+  { keywords: ["vegetable raita"], path: "/VegSpicyMenu/VegetableRaita.jpg" },
+  { keywords: ["jeera raita"], path: "/VegSpicyMenu/JeeraRaita.webp" },
+  { keywords: ["plain curd"], path: "/VegSpicyMenu/PlainCurd.jpg" },
+  { keywords: ["green salad"], path: "/VegSpicyMenu/GreenSalad.jpg" },
+  { keywords: ["onion salad"], path: "/VegSpicyMenu/onionsalad.jpeg" },
+  { keywords: ["fried papad"], path: "/VegSpicyMenu/FriedPapad.jpg" },
+  { keywords: ["roasted papad"], path: "/VegSpicyMenu/RoastedPapad.jpg" },
+  { keywords: ["gulab jamun"], path: "/VegSpicyMenu/GulabJamun.jpg" },
+  { keywords: ["classic thali"], path: "/VegSpicyMenu/ClassicThali.png" },
+  { keywords: ["premium thali"], path: "/VegSpicyMenu/PremiumThali.png" },
+  { keywords: ["shahi thali"], path: "/VegSpicyMenu/ShahiThali.png" },
+  { keywords: ["combo"], path: "/VegSpicyMenu/PFC_RS140.png" },
+];
+
+function resolveVegSpicyMenuImage(itemName: string, fallbackImage: string) {
+  const normalized = String(itemName || "").toLowerCase();
+  const matched = VEG_SPICY_MENU_IMAGE_MAP.find((entry) =>
+    entry.keywords.some((keyword) => normalized.includes(keyword)),
+  );
+
+  return matched?.path || fallbackImage;
+}
+
 function computeDeliveryCharge(orderType: "dine-in" | "takeaway" | "delivery", subtotal: number, deliveryArea: DeliveryArea | "") {
   if (orderType !== "delivery") return 0;
   if (!deliveryArea) return 20;
@@ -519,7 +571,7 @@ export default function POS() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredItems.map((item) => (
               <Card key={item.id} className="overflow-hidden">
-                <img src={item.image} alt={item.name} className="w-full h-32 object-cover" />
+                <img src={resolveVegSpicyMenuImage(item.name, item.image)} alt={item.name} className="w-full h-36 object-cover object-center" />
                 <div className="p-3 space-y-2">
                   <h3 className="font-semibold">{item.name}</h3>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -636,10 +688,17 @@ export default function POS() {
           <div className="p-4 space-y-3 bg-[#f7fcff]">
             {cart.length === 0 && <p className="text-muted-foreground">Cart is empty</p>}
             {cart.map((item) => (
-              <div key={item.id} className="rounded-xl border border-blue-200 p-3 bg-white flex items-center justify-between gap-3 shadow-sm">
-                <div>
+              <div key={`${item.id}-${item.variant}`} className="rounded-xl border border-blue-200 p-3 bg-white flex items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <img
+                    src={resolveVegSpicyMenuImage(item.name, menuImageUrl)}
+                    alt={item.name}
+                    className="h-14 w-14 rounded-lg border border-blue-100 object-cover object-center shrink-0"
+                  />
+                  <div className="min-w-0">
                   <p className="font-semibold">{item.name} ({item.variant})</p>
                   <p className="text-sm text-muted-foreground">Rs {item.unitPrice} each</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, -1)}>-</Button>
