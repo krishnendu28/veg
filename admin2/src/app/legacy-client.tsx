@@ -7,7 +7,7 @@ import { TOKEN_KEY } from "@/lib/constants";
 
 export default function LegacyClientApp() {
   useEffect(() => {
-    setBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001");
+    setBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000");
     setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
   }, []);
 

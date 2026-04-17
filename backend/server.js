@@ -10,6 +10,8 @@ dotenv.config();
 const server = http.createServer(app);
 
 const PORT = Number(process.env.PORT) || 5000;
+const HOST = process.env.HOST || "0.0.0.0";
+const IS_MANAGED_PORT = Boolean(process.env.PORT);
 const MONGO_URI = process.env.MONGO_URI;
 const MAX_PORT_RETRIES = 10;
 let shuttingDown = false;
@@ -39,6 +41,13 @@ function listenWithFallback(port, retries = 0) {
   const onError = (error) => {
     server.off("listening", onListening);
 
+    // On managed platforms (Render, etc.), the assigned PORT must be used.
+    // If it's unavailable, exit and let the platform restart/report the error.
+    if (error && error.code === "EADDRINUSE" && IS_MANAGED_PORT) {
+      logger.error("server.managed_port_in_use", { port });
+      process.exit(1);
+    }
+
     if (error && error.code === "EADDRINUSE" && retries < MAX_PORT_RETRIES) {
       const nextPort = port + 1;
       logger.warn("server.port_busy_retry", { port, nextPort });
@@ -59,7 +68,7 @@ function listenWithFallback(port, retries = 0) {
 
   server.once("error", onError);
   server.once("listening", onListening);
-  server.listen(port);
+  server.listen(port, HOST);
 }
 
 function shutdown(signal) {
