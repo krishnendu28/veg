@@ -13,7 +13,6 @@ const PORT = Number(process.env.PORT) || 5000;
 const HOST = process.env.HOST || "0.0.0.0";
 const IS_MANAGED_PORT = Boolean(process.env.PORT);
 const MONGO_URI = process.env.MONGO_URI;
-const MAX_PORT_RETRIES = 10;
 let shuttingDown = false;
 
 server.keepAliveTimeout = 65000;
@@ -34,24 +33,18 @@ async function startServer() {
     logger.warn("database.memory_mode", { reason: "MONGO_URI not set" });
   }
 
-  listenWithFallback(PORT);
+  listenOnConfiguredPort(PORT);
 }
 
-function listenWithFallback(port, retries = 0) {
+function listenOnConfiguredPort(port) {
   const onError = (error) => {
     server.off("listening", onListening);
 
-    // On managed platforms (Render, etc.), the assigned PORT must be used.
-    // If it's unavailable, exit and let the platform restart/report the error.
-    if (error && error.code === "EADDRINUSE" && IS_MANAGED_PORT) {
-      logger.error("server.managed_port_in_use", { port });
+    if (error && error.code === "EADDRINUSE") {
+      const event = IS_MANAGED_PORT ? "server.managed_port_in_use" : "server.port_in_use";
+      logger.error(event, { port });
+      logger.error("server.startup_error", { error: `Port ${port} is already in use` });
       process.exit(1);
-    }
-
-    if (error && error.code === "EADDRINUSE" && retries < MAX_PORT_RETRIES) {
-      const nextPort = port + 1;
-      logger.warn("server.port_busy_retry", { port, nextPort });
-      listenWithFallback(nextPort, retries + 1);
       return;
     }
 
