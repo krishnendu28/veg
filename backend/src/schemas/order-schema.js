@@ -13,10 +13,11 @@ export const orderIdParamSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
+  customerId: z.string().trim().optional(),
   customerName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(7).max(25),
   address: z.string().trim().min(5).max(300),
-  paymentMethod: z.enum(["Cash", "GPay", "PhonePe"]).default("Cash"),
+  paymentMethod: z.enum(["Cash", "GPay", "PhonePe", "Account"]).default("Cash"),
   items: z.array(orderItemSchema).min(1),
   total: z.coerce.number().nonnegative(),
   deliveryCharge: z.coerce.number().nonnegative().default(0),

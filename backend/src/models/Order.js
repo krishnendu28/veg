@@ -13,12 +13,13 @@ const orderItemSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    customerId: { type: String, default: "", trim: true },
     customerName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     paymentMethod: {
       type: String,
-      enum: ["Cash", "GPay", "PhonePe"],
+      enum: ["Cash", "GPay", "PhonePe", "Account"],
       default: "Cash",
     },
     items: { type: [orderItemSchema], required: true },
@@ -29,6 +30,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["Preparing", "Ready", "Delivered"],
       default: "Preparing",
     },
+    customerBalanceAfter: { type: Number, default: null },
     createdAt: { type: Date, default: Date.now },
   },
   { versionKey: false },

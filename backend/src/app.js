@@ -5,6 +5,7 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import { corsOptions } from "./config/cors.js";
 import authRoutes from "./routes/authRoutes.js";
+import customerRoutes from "./routes/customerRoutes.js";
 import outletRoutes from "./routes/outletRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import menuRoutes from "./routes/menuRoutes.js";
@@ -34,6 +35,7 @@ app.use(apiRateLimiter);
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/customers", customerRoutes);
 app.use("/api/outlets", outletRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/orders", orderRoutes);

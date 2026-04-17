@@ -53,6 +53,7 @@ export type BridgeOrderItem = {
 
 export type BridgeOrder = {
   _id: string;
+  customerId?: string;
   customerName: string;
   phone: string;
   address: string;
@@ -60,8 +61,35 @@ export type BridgeOrder = {
   items: BridgeOrderItem[];
   total: number;
   deliveryCharge?: number;
+  customerBalanceAfter?: number | null;
   status: BridgeOrderStatus;
   createdAt: string;
+};
+
+export type BridgeCustomerTransaction = {
+  _id: string;
+  type: "credit" | "debit";
+  amount: number;
+  note?: string;
+  orderId?: string;
+  balanceAfter: number;
+  createdAt: string;
+};
+
+export type BridgeCustomer = {
+  _id: string;
+  name: string;
+  phone: string;
+  address: string;
+  balance: number;
+  due: number;
+  wallet: number;
+  orderCount: number;
+  lifetimeSpend: number;
+  lastVisit: string | null;
+  createdAt: string;
+  updatedAt: string;
+  transactions?: BridgeCustomerTransaction[];
 };
 
 export type BridgeMenuItem = {
@@ -498,6 +526,72 @@ export async function fetchBridgeOrders(): Promise<BridgeOrder[]> {
   if (!response.ok) throw new Error("Failed to fetch bridge orders");
   const data = await response.json();
   return Array.isArray(data) ? data : [];
+}
+
+export async function fetchBridgeCustomers(): Promise<BridgeCustomer[]> {
+  const response = await fetch(`${USER_BACKEND_URL}/api/customers`);
+  if (!response.ok) throw new Error("Failed to fetch bridge customers");
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function upsertBridgeCustomer(payload: {
+  name: string;
+  phone?: string;
+  address?: string;
+  openingBalance?: number;
+  note?: string;
+}) {
+  const response = await fetch(`${USER_BACKEND_URL}/api/customers`, {
+    method: "POST",
+    headers: buildAdminHeaders({
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw await buildRequestError(response, "Failed to save customer");
+  return response.json() as Promise<BridgeCustomer>;
+}
+
+export async function deleteBridgeCustomer(customerId: string) {
+  const response = await fetch(`${USER_BACKEND_URL}/api/customers/${customerId}`, {
+    method: "DELETE",
+    headers: buildAdminHeaders(),
+  });
+  if (!response.ok) throw await buildRequestError(response, "Failed to delete customer");
+}
+
+export function subscribeBridgeCustomers(onChange: (customers: BridgeCustomer[]) => void) {
+  let active = true;
+  let lastFingerprint = "";
+
+  const poll = async () => {
+    try {
+      const customers = await fetchBridgeCustomers();
+      const nextFingerprint = JSON.stringify(customers);
+      if (!lastFingerprint) {
+        lastFingerprint = nextFingerprint;
+        return;
+      }
+      if (nextFingerprint !== lastFingerprint) {
+        lastFingerprint = nextFingerprint;
+        onChange(customers);
+      }
+    } catch {
+      // no-op
+    }
+  };
+
+  void poll();
+  const pollId = window.setInterval(() => {
+    if (!active) return;
+    void poll();
+  }, BRIDGE_POLL_INTERVAL_MS);
+
+  return () => {
+    active = false;
+    window.clearInterval(pollId);
+  };
 }
 
 export async function patchBridgeOrderStatus(orderId: string, status: BridgeOrderStatus): Promise<BridgeOrder> {

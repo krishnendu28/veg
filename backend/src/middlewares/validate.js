@@ -10,7 +10,7 @@ export function validateRequest({ bodySchema, paramsSchema, querySchema }) {
         req.params = paramsSchema.parse(req.params);
       }
       if (querySchema) {
-        req.query = querySchema.parse(req.query);
+        req.validatedQuery = querySchema.parse(req.query);
       }
       next();
     } catch (error) {

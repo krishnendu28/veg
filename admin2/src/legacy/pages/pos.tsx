@@ -5,13 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ReceiptText, ShoppingCart } from "lucide-react";
 import {
+  BridgeCustomer,
   BridgeMenuItem,
+  fetchBridgeCustomers,
   fetchBridgeMenuGroups,
   getMenuImageUrl,
   getBridgeMenuGroups,
   getStoredTables,
   saveStoredTables,
   subscribeBridgeMenu,
+  subscribeBridgeCustomers,
   USER_BACKEND_URL,
 } from "@/lib/bridge";
 
@@ -103,11 +106,13 @@ export default function POS() {
   const [activeGroupId, setActiveGroupId] = useState(menuGroups[0]?.id || "");
   const [search, setSearch] = useState("");
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway" | "delivery">("dine-in");
-  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "GPay" | "PhonePe">("Cash");
+  const [paymentMethod, setPaymentMethod] = useState<"Cash" | "GPay" | "PhonePe" | "Account">("Cash");
   const [deliveryArea, setDeliveryArea] = useState<DeliveryArea | "">("");
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [placing, setPlacing] = useState(false);
+  const [customers, setCustomers] = useState<BridgeCustomer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<BridgeCustomer | null>(null);
 
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -138,6 +143,30 @@ export default function POS() {
     });
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadCustomers() {
+      try {
+        const nextCustomers = await fetchBridgeCustomers();
+        if (active) {
+          setCustomers(nextCustomers);
+        }
+      } catch {
+        if (active) {
+          setCustomers([]);
+        }
+      }
+    }
+
+    loadCustomers();
+    return subscribeBridgeCustomers((nextCustomers) => {
+      if (active) {
+        setCustomers(nextCustomers);
+      }
+    });
+  }, []);
+
   const filteredItems = useMemo(
     () =>
       (activeGroup?.items || []).filter((item) => item.name.toLowerCase().includes(search.trim().toLowerCase())),
@@ -147,6 +176,33 @@ export default function POS() {
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.totalPrice, 0), [cart]);
   const deliveryCharge = cart.length > 0 ? computeDeliveryCharge(orderType, subtotal, deliveryArea) : 0;
   const total = subtotal + deliveryCharge;
+  const customerQuery = customerName.trim().toLowerCase();
+  const resolvedCustomer = useMemo(() => {
+    if (selectedCustomer) return selectedCustomer;
+    if (!customerQuery && !phone.trim()) return null;
+
+    return (
+      customers.find((customer) => {
+        const customerNameMatches = customer.name.toLowerCase() === customerQuery;
+        const customerNameIncludes = customerQuery.length >= 2 && customer.name.toLowerCase().includes(customerQuery);
+        const phoneMatches = phone.trim() ? customer.phone.replace(/\D/g, "") === phone.replace(/\D/g, "") : false;
+        return customerNameMatches || customerNameIncludes || phoneMatches;
+      }) || null
+    );
+  }, [customers, customerQuery, phone, selectedCustomer]);
+  const customerBalanceAfterBill = resolvedCustomer && paymentMethod === "Account" ? resolvedCustomer.balance - total : resolvedCustomer?.balance ?? null;
+  const customerSuggestions = useMemo(() => {
+    const query = customerName.trim().toLowerCase();
+    if (query.length < 2 && phone.trim().length < 3) {
+      return customers.slice(0, 6);
+    }
+
+    return customers.filter((customer) => {
+      const nameMatch = customer.name.toLowerCase().includes(query);
+      const phoneMatch = phone.trim() ? customer.phone.includes(phone.replace(/\D/g, "")) : false;
+      return nameMatch || phoneMatch;
+    }).slice(0, 8);
+  }, [customers, customerName, phone]);
   const deliveryTermsMessage =
     deliveryArea === "Shapoorji Sukhobrishti"
       ? subtotal < 200
@@ -203,6 +259,19 @@ export default function POS() {
     );
   }
 
+  function selectCustomer(customer: BridgeCustomer) {
+    setSelectedCustomer(customer);
+    setCustomerName(customer.name);
+    if (customer.phone) {
+      setPhone(customer.phone);
+    }
+    setPaymentMethod("Account");
+  }
+
+  function clearCustomerSelection() {
+    setSelectedCustomer(null);
+  }
+
   async function useAutoLocation() {
     if (!navigator.geolocation) {
       setAutoLocation("Geolocation not supported on this browser");
@@ -231,6 +300,10 @@ export default function POS() {
   async function placeOrder() {
     if (orderType === "delivery" && (!customerName.trim() || !phone.trim())) return;
     if (cart.length === 0) return;
+    if (paymentMethod === "Account" && !resolvedCustomer) {
+      window.alert("Select a customer before billing to account.");
+      return;
+    }
 
     if (orderType === "dine-in" && !selectedTableId) {
       return;
@@ -264,6 +337,7 @@ export default function POS() {
             : ["Counter pickup"];
 
       const payload = {
+        customerId: resolvedCustomer?._id,
         customerName: customerName.trim() || (orderType === "dine-in" ? "Walk-in Guest" : "Takeaway Guest"),
         phone: normalizedPhone,
         address: addressParts.join(", "),
@@ -307,6 +381,12 @@ export default function POS() {
         saveStoredTables(updatedTables);
       }
 
+      try {
+        setCustomers(await fetchBridgeCustomers());
+      } catch {
+        // no-op
+      }
+
       setCart([]);
       setCustomerName("");
       setPhone("");
@@ -318,6 +398,7 @@ export default function POS() {
       setPaymentMethod("Cash");
       setSelectedTableId(null);
       setSavedAt(null);
+      clearCustomerSelection();
     } finally {
       setPlacing(false);
     }
@@ -352,6 +433,7 @@ export default function POS() {
     const orderNo = `CBK-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
     const customerLabel = customerName.trim() || (orderType === "dine-in" ? "Walk-in Guest" : "Takeaway Guest");
     const phoneLabel = phone.trim() || "N/A";
+    const accountBalanceAfter = resolvedCustomer && paymentMethod === "Account" ? resolvedCustomer.balance - total : null;
     const tableLabel = tables.find((table) => table.id === selectedTableId)?.name || "Not selected";
     const deliveryAddressLabel = [
       deliveryArea && `Area: ${deliveryArea}`,
@@ -490,6 +572,11 @@ export default function POS() {
               <div><strong>${locationTitle}:</strong> ${locationValue}</div>
               <div><strong>Customer:</strong> ${customerLabel}</div>
               <div><strong>Phone:</strong> ${phoneLabel}</div>
+              ${
+                accountBalanceAfter !== null
+                  ? `<div><strong>Balance After:</strong> ${accountBalanceAfter >= 0 ? `Rs ${accountBalanceAfter.toFixed(2)}` : `Due Rs ${Math.abs(accountBalanceAfter).toFixed(2)}`}</div>`
+                  : ""
+              }
             </div>
 
             <div class="line"></div>
@@ -617,10 +704,13 @@ export default function POS() {
             <Button variant={orderType === "delivery" ? "default" : "outline"} onClick={() => setOrderType("delivery")}>Delivery</Button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <Button variant={paymentMethod === "Cash" ? "default" : "outline"} onClick={() => setPaymentMethod("Cash")}>Cash</Button>
             <Button variant={paymentMethod === "GPay" ? "default" : "outline"} onClick={() => setPaymentMethod("GPay")}>GPay</Button>
             <Button variant={paymentMethod === "PhonePe" ? "default" : "outline"} onClick={() => setPaymentMethod("PhonePe")}>PhonePe</Button>
+            <Button variant={paymentMethod === "Account" ? "default" : "outline"} onClick={() => setPaymentMethod("Account")} disabled={!resolvedCustomer}>
+              Account
+            </Button>
           </div>
 
           {orderType === "dine-in" && (
@@ -642,14 +732,76 @@ export default function POS() {
 
           <Input
             value={customerName}
-            onChange={(event) => setCustomerName(event.target.value)}
+            onChange={(event) => {
+              setCustomerName(event.target.value);
+              clearCustomerSelection();
+            }}
             placeholder="Customer Name"
           />
           <Input
             value={phone}
-            onChange={(event) => setPhone(event.target.value)}
+            onChange={(event) => {
+              setPhone(event.target.value);
+              clearCustomerSelection();
+            }}
             placeholder="Phone"
           />
+
+          {(customerName.trim().length >= 2 || phone.trim().length >= 3) && customerSuggestions.length > 0 && (
+            <div className="rounded-lg border border-blue-200 bg-white p-2 shadow-sm space-y-2 max-h-56 overflow-auto">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Matches</p>
+              <div className="space-y-2">
+                {customerSuggestions.map((customer) => (
+                  <button
+                    key={customer._id}
+                    type="button"
+                    className="w-full rounded-md border border-blue-100 px-3 py-2 text-left hover:bg-blue-50 transition-colors"
+                    onClick={() => selectCustomer(customer)}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{customer.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{customer.phone || "No phone"}</p>
+                      </div>
+                      <div className="text-right text-sm shrink-0">
+                        <p className={customer.balance >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-rose-700"}>
+                          {customer.balance >= 0 ? `Balance Rs ${customer.balance.toFixed(2)}` : `Due Rs ${Math.abs(customer.balance).toFixed(2)}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{customer.orderCount} orders</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {resolvedCustomer && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950 space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold">{resolvedCustomer.name}</span>
+                <button type="button" className="text-xs underline" onClick={clearCustomerSelection}>
+                  Clear
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Current balance</span>
+                <span className={resolvedCustomer.balance >= 0 ? "font-semibold" : "font-semibold text-rose-700"}>
+                  {resolvedCustomer.balance >= 0 ? `Rs ${resolvedCustomer.balance.toFixed(2)}` : `Due Rs ${Math.abs(resolvedCustomer.balance).toFixed(2)}`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>After this bill</span>
+                <span className={customerBalanceAfterBill !== null && customerBalanceAfterBill >= 0 ? "font-semibold" : "font-semibold text-rose-700"}>
+                  {customerBalanceAfterBill === null
+                    ? "-"
+                    : customerBalanceAfterBill >= 0
+                      ? `Rs ${customerBalanceAfterBill.toFixed(2)}`
+                      : `Due Rs ${Math.abs(customerBalanceAfterBill).toFixed(2)}`}
+                </span>
+              </div>
+            </div>
+          )}
 
             {orderType === "delivery" && (
               <div className="space-y-2.5">
@@ -735,6 +887,7 @@ export default function POS() {
             disabled={
               placing ||
               cart.length === 0 ||
+              (paymentMethod === "Account" && !resolvedCustomer) ||
               (orderType === "delivery" && !customerName.trim()) ||
               (orderType === "delivery" && !phone.trim()) ||
               (orderType === "dine-in" && !selectedTableId) ||

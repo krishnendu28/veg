@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { Order } from "../models/Order.js";
+import { ensureCustomerFromOrder } from "./customerService.js";
 import { logger } from "../utils/logger.js";
 
 const memoryOrders = [];
@@ -35,7 +36,7 @@ export function isMongoEnabled() {
   return useMongo;
 }
 
-export async function createOrder({ customerName, phone, address, paymentMethod, items, total, deliveryCharge }) {
+export async function createOrder({ customerId, customerName, phone, address, paymentMethod, items, total, deliveryCharge }) {
   const normalizedItems = items.map((item) => ({
     name: item.name,
     variant: item.variant || "Regular",
@@ -45,16 +46,30 @@ export async function createOrder({ customerName, phone, address, paymentMethod,
   }));
 
   const payload = {
+    customerId: String(customerId || "").trim(),
     customerName,
     phone,
     address,
-    paymentMethod: ["Cash", "GPay", "PhonePe"].includes(String(paymentMethod)) ? String(paymentMethod) : "Cash",
+    paymentMethod: ["Cash", "GPay", "PhonePe", "Account"].includes(String(paymentMethod)) ? String(paymentMethod) : "Cash",
     items: normalizedItems,
     total: Number(total) || 0,
     deliveryCharge: Number(deliveryCharge) || 0,
     status: "Preparing",
     createdAt: new Date(),
   };
+
+  const customer = await ensureCustomerFromOrder({
+    customerId: payload.customerId,
+    name: payload.customerName,
+    phone: payload.phone,
+    address: payload.address,
+    total: Number(payload.total) + Number(payload.deliveryCharge),
+    orderId: "",
+    paymentMethod: payload.paymentMethod,
+  });
+
+  payload.customerId = customer?._id ? String(customer._id) : payload.customerId;
+  payload.customerBalanceAfter = customer ? Number(customer.balance) || 0 : null;
 
   return withMongoFallback(
     "createOrder",
