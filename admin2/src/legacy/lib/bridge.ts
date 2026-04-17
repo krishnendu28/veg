@@ -1,4 +1,5 @@
-export const USER_BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+const DEFAULT_BACKEND_URL = process.env.NODE_ENV === "production" ? "https://veg-sqjs.onrender.com" : "http://localhost:5000";
+export const USER_BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_BACKEND_URL;
 const TABIO_SESSION_TOKEN_KEY = "tabio_session_token";
 const BRIDGE_POLL_INTERVAL_MS = 8000;
 

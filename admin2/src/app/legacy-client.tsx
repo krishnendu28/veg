@@ -7,7 +7,8 @@ import { TOKEN_KEY } from "@/lib/constants";
 
 export default function LegacyClientApp() {
   useEffect(() => {
-    setBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000");
+    const defaultBaseUrl = process.env.NODE_ENV === "production" ? "https://veg-sqjs.onrender.com" : "http://localhost:5000";
+    setBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL || defaultBaseUrl);
     setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
   }, []);
 
